@@ -13,6 +13,7 @@ class DeviceSettings:
 
     device_name = ""
     advertising_interval_ms = ""
+    controller_poll_interval_ms = ""
     cache_size_bytes = ""
     last_network_ssid = ""
     last_network_pass = ""
@@ -20,7 +21,7 @@ class DeviceSettings:
     def __init__(self, p_settings=None):
         if p_settings is None:
             p_settings = {'secrets_fp': "src/secrets.json", 'settings_fp': "src/device_settings.json", 'device_name': "Satyr", 'advertising_interval_ms': 250000,
-                          'cache_size_bytes': 100000, 'last_network_ssid': "", 'last_network_pass': ""}
+                          "controller_poll_interval_ms": 5500, 'cache_size_bytes': 100000, 'last_network_ssid': "", 'last_network_pass': ""}
 
         for attr in p_settings:
             self.__setattr__(attr, p_settings[attr])
@@ -63,10 +64,16 @@ class DeviceSettings:
     def _update_config_file(self):
         # TODO: Implement _update_config_file for DeviceSettings
         data = self.__dict__
-        with open(self.config_fp, 'w') as file:
-            json.dump(data, file)
 
-        raise NotImplementedError()
+        secrets = {k:v for k, v in data if (k == 'last_network_ssid') or (k == 'last_network_pass')}
+        data = {k:v for k, v in data if not ((k == 'last_network_ssid') or (k == 'last_network_pass'))}
+
+        # Write settings
+        with open(self.settings_fp, 'w') as file:
+            json.dump(data, file)
+        # Write secrets
+        with open(self.secrets_fp, 'w') as file:
+            json.dump(secrets, file)
 
 
 def do_startup_blink(p_pin):

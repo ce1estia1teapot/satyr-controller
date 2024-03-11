@@ -1,9 +1,12 @@
 import sys
 
+import machine
+
 sys.path.append("")
 
 import aioble
 import uasyncio as asyncio
+import urequests
 import bluetooth
 import ujson as json
 import mip
@@ -15,12 +18,15 @@ import time
 from machine import Pin, Timer
 from micropython import const
 from src.utilities import DeviceSettings, do_startup_blink, network_scan_for_ssid, network_connect_by_ssid
-from src.ble.file_client_ble_utilities import scan_for_sensors, validate_device
+from src.ble.file_client_ble_utilities import FileServer, scan_for_sensors, validate_device
+
+# #TODO: Enable specifying default settings for new sensors which they pull from the server on first boot
 
 # ===== 1. Boot: Load secrets and attempt network connection =====
 # Defining LED Pin and setting to off
 led_pin = Pin("LED", Pin.OUT)
 led_pin.off()
+do_startup_blink(led_pin)
 
 # Loading device settings
 device_settings = DeviceSettings.initialize_from_files(p_config_fp='src/device_settings.json', p_secrets_fp='src/secrets.json')
@@ -51,6 +57,8 @@ else:
 
 # ===== 2. Main Loop =====
 async def main():
+    global device_settings
+
     while True:
         # 2a: Scan for connections
         found_devices = await scan_for_sensors()
@@ -60,13 +68,25 @@ async def main():
         if len(valid_devices) > 0:
             for device in valid_devices:
                 # Establish connection
-                #
-                pass
+                server = FileServer(device)
+                await server.connect()
+
+                # List files in data directory
+                filenames = await server.list("data")
+
+                # Downlink files to controller
+                for name in filenames:
+                    await server.download(f'data/{name}', f'data/{name}')
         else:
             pass
 
+        time.sleep(device_settings.controller_poll_interval_ms / 1000)
+
         # 2b: Attempt to uplink cached measurements to server
+        # TODO: Implement server uplink and local records flush on controller
 
 # ===== 3. Check with server whether there are any code/settings updates for sensors
+# TODO: Implement 'watchtower' function to handle settings changes for controller, sensors
 
 # ===== Final: Run main and update methods
+asyncio.run(main())

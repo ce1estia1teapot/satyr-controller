@@ -28,6 +28,7 @@ _COMMAND_RECV = const(1)  # Not yet implemented.
 _COMMAND_LIST = const(2)
 _COMMAND_SIZE = const(3)
 _COMMAND_DONE = const(4)
+_COMMAND_DEL = const(5)
 
 # Status Codes
 _STATUS_OK = const(0)
@@ -115,7 +116,9 @@ class FileServer:
             results += mv[:n]
             if results[len(results) - 1] == ord("\n") and results[len(results) - 2] == ord("\n"):
                 break
-        print(results.decode().split("\n"))
+        filenames = results.decode().split("\n")
+        print(filenames)
+        return filenames
 
     async def disconnect(self):
         if self._connection:

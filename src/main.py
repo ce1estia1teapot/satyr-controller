@@ -14,7 +14,7 @@ import time
 
 from machine import Pin, Timer
 from micropython import const
-from src.utilities import do_startup_blink, network_scan_for_ssid, network_connect_by_ssid
+from src.utilities import DeviceSettings, do_startup_blink, network_scan_for_ssid, network_connect_by_ssid
 from src.ble.file_client_ble_utilities import scan_for_sensors, validate_device
 
 # ===== 1. Boot: Load secrets and attempt network connection =====
@@ -22,15 +22,15 @@ from src.ble.file_client_ble_utilities import scan_for_sensors, validate_device
 led_pin = Pin("LED", Pin.OUT)
 led_pin.off()
 
-with open("src/secrets.json", 'r') as file:
-    secrets = json.load(file)
+# Loading device settings
+device_settings = DeviceSettings.initialize_from_files(p_config_fp='src/device_settings.json', p_secrets_fp='src/secrets.json')
 
 # Defining Network
 nic = network.WLAN(network.STA_IF)
 nic.active(True)
 
-is_connected_wifi: bool = network_connect_by_ssid(p_network=nic, p_ssid=secrets['network_ssid'],
-                                                  p_pass=secrets['network_password'])
+is_connected_wifi: bool = network_connect_by_ssid(p_network=nic, p_ssid=device_settings.last_network_ssid,
+                                                  p_pass=device_settings.last_network_pass)
 
 # 1a: If successful, continue to 2
 if is_connected_wifi:
@@ -40,6 +40,7 @@ if is_connected_wifi:
 else:
     print('Not connected to wifi')
     sys.exit()
+    # TODO: Implement connection retry protocol in main.py
     # 1bi: Advertise ble connection
     # 1bii: Connect to smart phone
     # 1biii: Prompt, requesting credentials
@@ -56,6 +57,14 @@ async def main():
         # 2ai: If there are interesting devices, validate
         valid_devices = [x for x in found_devices if validate_device(x)]
         # 2aii: Receive files from each validated device
+        if len(valid_devices) > 0:
+            for device in valid_devices:
+                # Establish connection
+                #
+                pass
+        else:
+            pass
+
         # 2b: Attempt to uplink cached measurements to server
 
 # ===== 3. Check with server whether there are any code/settings updates for sensors

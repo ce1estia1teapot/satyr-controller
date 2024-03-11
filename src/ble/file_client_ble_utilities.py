@@ -122,7 +122,6 @@ class FileServer:
             await self._connection.disconnect()
 
 
-
 async def scan_for_sensors(p_found_devices=None):
     print('Initiating scan for satyr devices with data...')
 
@@ -143,5 +142,5 @@ async def validate_device(p_device):
     the server.
     :return: A bool representing whether the provided device is a valid one
     """
-
-    raise NotImplementedError()
+    # TODO: Implement validate device
+    return True

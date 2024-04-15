@@ -18,11 +18,11 @@ import time
 from machine import Pin, Timer
 from micropython import const
 from src.utilities import DeviceSettings, do_startup_blink, network_scan_for_ssid, network_connect_by_ssid
-from src.ble.file_client_ble_utilities import FileServer, scan_for_sensors, validate_device
+from src.ble.string_ble_utils import scan_for_sensors, validate_device
 
 # #TODO: Enable specifying default settings for new sensors which they pull from the server on first boot
 
-# ===== 1. Boot: Load secrets and attempt network connection =====
+# ===== 1. Boot and Initialize: Load secrets and attempt network connection =====
 # Defining LED Pin and setting to off
 led_pin = Pin("LED", Pin.OUT)
 led_pin.off()
@@ -30,6 +30,9 @@ do_startup_blink(led_pin)
 
 # Loading device settings
 device_settings = DeviceSettings.initialize_from_files(p_config_fp='src/device_settings.json', p_secrets_fp='src/secrets.json')
+
+m_connected_devices = []
+m_connections = []
 
 # Defining Network
 nic = network.WLAN(network.STA_IF)
@@ -45,7 +48,7 @@ if is_connected_wifi:
 # 1b: If network connection unsuccessful, enter BLE pairing mode
 else:
     print('Not connected to wifi')
-    sys.exit()
+    pass
     # TODO: Implement connection retry protocol in main.py
     # 1bi: Advertise ble connection
     # 1bii: Connect to smart phone
@@ -62,23 +65,34 @@ async def main():
     while True:
         # 2a: Scan for connections
         found_devices = await scan_for_sensors()
-        # 2ai: If there are interesting devices, validate
-        valid_devices = [x for x in found_devices if validate_device(x)]
-        # 2aii: Receive files from each validated device
-        if len(valid_devices) > 0:
-            for device in valid_devices:
+
+        # 2ai: If there are interesting devices, validate and add to archive of devices
+        for device in found_devices:
+            if validate_device(device) and (device not in m_connected_devices):
+                m_connected_devices.append(device)
+
+        # 2aii: Try connecting to all previously connected devices
+        if len(m_connected_devices) > 0:
+            print(f'Contacting and polling {len(m_connected_devices)} devices...')
+            for device in m_connected_devices:
                 # Establish connection
-                server = FileServer(device)
-                await server.connect()
+                print(f'Connecting to {device}')
+                try:
+                    print("Connecting to", device)
+                    connection = await device.connect()
+                    m_connections.append(connection)
+                except asyncio.TimeoutError:
+                    print("Timeout during connection")
+                    return
+                except AttributeError as e:
+                    print(f'AttributeError discovering services/characteristics: {e}')
 
-                # List files in data directory
-                filenames = await server.list("data")
+            # Wait for writes to subscribed characteristic(s) for all active connections
+            if len(m_connections) > 0:
+                raise NotImplementedError()
 
-                # Downlink files to controller
-                for name in filenames:
-                    await server.download(f'data/{name}', f'data/{name}')
         else:
-            pass
+            print(f'No devices in archive to connect with')
 
         time.sleep(device_settings.controller_poll_interval_ms / 1000)
 
